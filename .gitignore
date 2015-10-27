@@ -1,0 +1,4 @@
+*.o
+*.exe
+*.depend
+gmon.out
