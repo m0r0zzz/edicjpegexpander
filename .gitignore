@@ -2,3 +2,6 @@
 *.exe
 *.depend
 gmon.out
+*.dll
+*.jpg
+*.bin

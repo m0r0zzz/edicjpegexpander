@@ -1,5 +1,6 @@
 #include "Main.hpp"
 #include "Header.hpp"
+#include <limits>
 
 bool writeStart(uint8_t c, FILE* out){
     switch(c){
@@ -16,8 +17,25 @@ bool writeStart(uint8_t c, FILE* out){
 
 int main(int argc, char** argv){
     uint32_t counter = 0;
-    if(argc != 2){
-        cout << "JPEG file expander\nUsage:\t" << argv[0] << " <infile>" << endl;
+
+    uint32_t lastsz = 0;
+    uint32_t szcounter = 0;
+    uint32_t maxsz = 0, maxsznum = 0;
+    uint32_t minsz = std::numeric_limits<uint32_t>::max(), minsznum = 0;
+
+    uint32_t timer;
+    double sec;
+    bool first = true;
+    bool first2 = true;
+    double timerval = 0;
+    double timercounter = 0;
+    double lasttimer = 0;
+    double mintimer = std::numeric_limits<double>::max(); uint32_t mintimernum = 0;
+    double maxtimer = 0; uint32_t maxtimernum = 0;
+    double starttimer = 0;
+    double endtimer = 0;
+    if(argc != 2 && argc != 3){
+        cout << "JPEG file expander\nUsage:\t" << argv[0] << " <infile> " << endl;
         return 0;
     }
     FILE* in = fopen(argv[1],"rb");
@@ -28,9 +46,9 @@ int main(int argc, char** argv){
 
     char str[64];
     std::time_t t = time(nullptr);
-    strftime(str, 64, "mkdir .\\images-%d_%m_%Y-%H_%M_%S" ,localtime(&t));
+    strftime(str, 64, "mkdir .\\out\\images-%d_%m_%Y-%H_%M_%S" ,localtime(&t));
     system(str);
-    strftime(str, 64, ".\\images-%d_%m_%Y-%H_%M_%S\\" ,localtime(&t));
+    strftime(str, 64, ".\\out\\images-%d_%m_%Y-%H_%M_%S\\" ,localtime(&t));
 
     while(!feof(in)){
             uint8_t sof[2] = {0, 0};
@@ -44,6 +62,7 @@ int main(int argc, char** argv){
             goto final;
 
         sof_found:
+            lastsz = 0;
             counter++;
             char filename[64];
             sprintf(filename,"%s%d.jpg", str,counter);
@@ -54,34 +73,43 @@ int main(int argc, char** argv){
             }
             cout << filename << endl;
             fwrite(SOI,szSOI,1, out);
+            lastsz += szSOI;
             uint8_t q;
             uint16_t w,h;
             fread(&q,1,1,in);
             fread(&h,2,1,in);
             fread(&w,2,1,in);
+            lastsz += 5;
 
             fwrite(DQT_Y,szDQT_Y,1,out);
             fwrite(&QTABLES_Y[szQTABLE*q], szQTABLE, 1, out);
+            lastsz += szQTABLE + szDQT_Y;
 
             fwrite(DQT_UV,szDQT_UV,1,out);
             fwrite(&QTABLES_UV[szQTABLE*q], szQTABLE, 1, out);
+            lastsz += szQTABLE + szDQT_UV;
 
             fwrite(SOF_A,szSOF_A,1,out);
             fwrite(&h,2,1,out);
             fwrite(&w,2,1,out);
             fwrite(SOF_B,szSOF_B,1,out);
+            lastsz += szSOF_A + 2 + 2 + szSOF_B;
 
             fwrite(DHT_Y_DC,szDHT_Y_DC,1,out);
             fwrite(Y_DC_TABLE, szY_DC_TABLE,1,out);
+            lastsz += szDHT_Y_DC + szY_DC_TABLE;
 
             fwrite(DHT_Y_AC,szDHT_Y_AC,1,out);
             fwrite(Y_AC_TABLE,szY_AC_TABLE,1,out);
+            lastsz += szDHT_Y_AC + szY_AC_TABLE;
 
             fwrite(DHT_UV_DC,szDHT_UV_DC,1,out);
             fwrite(UV_DC_TABLE, szUV_DC_TABLE, 1, out);
+            lastsz += szDHT_UV_DC + szUV_DC_TABLE;
 
             fwrite(DHT_UV_AC,szDHT_UV_AC,1,out);
             fwrite(UV_AC_TABLE,szUV_AC_TABLE,1,out);
+            lastsz += szDHT_UV_AC + szUV_AC_TABLE;
 
             while(!feof(in)){
                 uint8_t tmp;
@@ -130,13 +158,26 @@ int main(int argc, char** argv){
                 char subsec[EXIFSUBSEC_len];
                 memset(datetime, 0, EXIFDATETIME_len);
                 memset(subsec, 0, EXIFSUBSEC_len);
-                uint32_t timer = 0;
                 uint8_t mtimer[4];
                 fread(&mtimer, 4, 1, in);
                 timer = mtimer[3] | (mtimer[2] << 8) | (mtimer[1] << 16) | (mtimer[0] << 24);
+                sec = timer/32768.0;
 
+                if(first){
+                    first = false;
+                    timerval = sec;
+                    lasttimer = 0;
+                    starttimer = sec;
+                    timercounter = 0;
+                } else {
+                    if(sec > timerval) lasttimer = sec - timerval;
+                    else if(sec < lasttimer) lasttimer = sec;
+                    timerval = sec;
+                    if(lasttimer > maxtimer) maxtimer = lasttimer, maxtimernum = counter;
+                    if(lasttimer < mintimer) mintimer = lasttimer, mintimernum = counter;
+                    timercounter+= lasttimer;
+                }
 
-                double sec = timer/32768.0;
                 unsigned int totalmillisecs = sec*1000.0;
                 unsigned int totalsecs = totalmillisecs/1000;
                 unsigned int totalmins = totalsecs/60;
@@ -162,6 +203,7 @@ int main(int argc, char** argv){
                 memcpy(exifheader+EXIFID_pos, exifid, EXIFID_len);
                 memcpy(exifheader+EXIFEXP_pos, exposurefrac, EXIFEXP_len);
                 fwrite(exifheader, szEXIF, 1, out);
+                lastsz += szEXIF;
             }
             while(!feof(in)){
                 uint8_t tmp;
@@ -186,9 +228,11 @@ int main(int argc, char** argv){
                     fread(&q,1,1,in);
                     if(q) goto c2_found;
                     fwrite(&tmp, 1, 1, out);
+                    lastsz++;
                     tmp = q;
                 }
                 fwrite(&tmp, 1, 1, out);
+                lastsz++;
             }
 
         c2_found:
@@ -203,9 +247,11 @@ int main(int argc, char** argv){
                     fread(&q,1,1,in);
                     if(q) goto c3_found;
                     fwrite(&tmp, 1, 1, out);
+                    lastsz++;
                     tmp = q;
                 }
                 fwrite(&tmp, 1, 1, out);
+                lastsz++;
             }
 
         c3_found:
@@ -220,9 +266,11 @@ int main(int argc, char** argv){
                     fread(&q,1,1,in);
                     if(q) goto end_found;
                     fwrite(&tmp, 1, 1, out);
+                    lastsz++;
                     tmp = q;
                 }
                 fwrite(&tmp, 1, 1, out);
+                lastsz++;
             }
 
         end_found:
@@ -235,10 +283,25 @@ int main(int argc, char** argv){
             }
 loopstart:
             fwrite(EOI,szEOI,1,out);
+            lastsz+= szEOI;
             fclose(out);
+
+            if(first2) first2 = false;
+            else{
+                szcounter += lastsz;
+                if(lastsz >maxsz ) maxsz = lastsz, maxsznum = counter;
+                if(lastsz < minsz ) minsz = lastsz, minsznum = counter;
+            }
     }
 final:
+    endtimer = sec;
     fclose(in);
+    char sname[64];
+    sprintf(sname, "%s%s", str, "stat.log");
+    FILE* sout = fopen(sname, "w");
+    fprintf(sout, "%d files:\n\tMax size - %d bytes (#%d)\n\tMin size - %d bytes (#%d)\n\tAvg size - %d bytes\n%.3f seconds:\n\t%.3f seconds max (#%d)\n\t%.3f seconds min (#%d)\nStart - %.3f seconds ( real 0.000)\nStop - %.3f seconds (real %.3f)\n",
+                    counter,                  maxsz,    maxsznum,          minsz,    minsznum,(szcounter)/counter, timercounter, maxtimer, maxtimernum, mintimer,       mintimernum,  starttimer,                     endtimer,        timercounter);
+    fclose(sout);
     cout << "Expanded successfully " << counter << " files." << endl;
 
     return 0;

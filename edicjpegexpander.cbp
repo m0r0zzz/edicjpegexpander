@@ -4,14 +4,22 @@
 	<Project>
 		<Option title="edicjpegexpander" />
 		<Option pch_mode="2" />
-		<Option compiler="gnu_gcc_compiler_i686" />
+		<Option compiler="gcc" />
+		<MakeCommands>
+			<Build command="" />
+			<CompileFile command="" />
+			<Clean command="" />
+			<DistClean command="" />
+			<AskRebuildNeeded command="" />
+			<SilentBuild command=" &gt; $(CMD_NULL)" />
+		</MakeCommands>
 		<Build>
 			<Target title="Debug">
 				<Option output="bin/Debug/edicjpegexpander" prefix_auto="1" extension_auto="1" />
 				<Option object_output="obj/Debug/" />
 				<Option type="1" />
-				<Option compiler="gnu_gcc_compiler_i686" />
-				<Option parameters="imgc.bin" />
+				<Option compiler="gcc" />
+				<Option parameters="im.bin" />
 				<Compiler>
 					<Add option="-pg" />
 					<Add option="-g" />
@@ -24,9 +32,8 @@
 				<Option output="bin/Release/edicjpegexpander" prefix_auto="1" extension_auto="1" />
 				<Option object_output="obj/Release/" />
 				<Option type="1" />
-				<Option compiler="gnu_gcc_compiler_i686" />
+				<Option compiler="gcc" />
 				<Compiler>
-					<Add option="-fomit-frame-pointer" />
 					<Add option="-fexpensive-optimizations" />
 					<Add option="-O3" />
 				</Compiler>
@@ -36,12 +43,18 @@
 			</Target>
 		</Build>
 		<Compiler>
-			<Add option="-Wall" />
-			<Add option="-std=c++11" />
+			<Add option="-std=c++14" />
+			<Add option="-m32" />
 		</Compiler>
 		<Linker>
-			<Add option="-static -static-libgcc" />
+			<Add option="-m32" />
 		</Linker>
+		<ExtraCommands>
+			<Add after="cp -vf /c/Dev/MSYS2/mingw32/bin/libgcc_s_dw2-1.dll ./" />
+			<Add after="cp -vf /c/Dev/MSYS2/mingw32/bin/libstdc++-6.dll ./" />
+			<Add after="cp -vf /c/Dev/MSYS2/mingw32/bin/libwinpthread-1.dll ./" />
+			<Mode after="always" />
+		</ExtraCommands>
 		<Unit filename="Header.hpp" />
 		<Unit filename="Main.cpp" />
 		<Unit filename="Main.hpp" />
